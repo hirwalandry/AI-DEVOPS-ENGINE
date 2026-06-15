@@ -14,12 +14,7 @@ class PostgreSQLTenantIsolationMiddleware:
             if GitHubIntegration.objects.filter(organization_name=request.user.username).exists():
                 tenant = request.user.username
 
-        if not tenant:
-            from .models import GitHubIntegration
-            integration = GitHubIntegration.objects.first()
-            tenant = integration.organization_name if integration else "default"
-
-        request.tenant = tenant
+        request.tenant = tenant or ""
 
         if tenant:
             if not re.match(r'^[a-zA-Z0-9_.-]+$', tenant):
