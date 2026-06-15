@@ -1,0 +1,19 @@
+{
+    admin off
+}
+
+:80 {
+    reverse_proxy /webhooks/* node-ingestion:3000
+    reverse_proxy /api/v1/billing/stripe-webhook/ django-dashboard:8000
+    reverse_proxy /api/v1/cli/trigger-fix django-dashboard:8000
+    reverse_proxy /api/v1/deployments/* django-dashboard:8000
+
+    @internal_apis {
+        path /api/v1/meter-event/*
+    }
+    respond @internal_apis "Access Denied: Internal Core Microservice Subsystem Security Perimeter Blocked." 403
+
+    reverse_proxy /* django-dashboard:8000 {
+        flush_interval -1
+    }
+}

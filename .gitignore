@@ -1,0 +1,64 @@
+# ==============================================================================
+# ENTERPRISE SECURITY & PLATFORM GITIGNORE PIPELINE
+# Prevents catastrophic leakage of U.S. compliance keys & server states.
+# ==============================================================================
+
+# 1. Critical Environment Variables & Secrets
+.env
+.env.*
+.patchbot.env
+*.env
+secrets.json
+
+# 2. Cryptographic Certificates & Private Keys
+certs/
+*.pem
+*.key
+*.pub
+*.pfx
+
+# 3. Python Ecosystem & Dependency Caching
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+venv/
+env/
+ENV/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# 4. Node.js Gateway Dependency Arrays
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# 5. Runtime Virtual Filesystems & Temporary Sandbox Mounts
+/tmp/sandbox_*
+/tmp/sandbox_runtime_*
+db_dumps/
+*.sql
+*.sql.gz
+*.log
+
+# 6. Local Server Database States (Development)
+*.sqlite3
+*.db
+postgres_data/
+redis_data/
+caddy_data/
+caddy_config/
+
+# 7. Compiled Frontend Distributions (TypeScript Target Directories)
+django-dashboard/static/js/dashboard.js
+django-dashboard/static/js/*.js.map
+
+# 8. Operating System System Fragments
+.DS_Store
+.DS_Store?
+Thumbs.db
+ehthumbs.db

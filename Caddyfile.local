@@ -1,0 +1,8 @@
+:80 {
+    handle /webhooks/* {
+        reverse_proxy node-ingestion:3000
+    }
+    handle {
+        reverse_proxy django-dashboard:8000
+    }
+}

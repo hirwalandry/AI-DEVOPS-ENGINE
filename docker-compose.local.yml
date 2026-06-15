@@ -1,0 +1,113 @@
+version: '3.8'
+
+networks:
+  ai-devops-local-network:
+    driver: bridge
+
+services:
+  postgres-db:
+    image: postgres:15-alpine
+    container_name: local-postgres
+    environment:
+      POSTGRES_DB: ai_devops_db_local
+      POSTGRES_USER: devops_local_admin
+      POSTGRES_PASSWORD: LocalDevelopmentPassword99
+    ports:
+      - "5433:5432"
+    networks:
+      - ai-devops-local-network
+
+  redis-broker:
+    image: redis:7-alpine
+    container_name: local-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - ai-devops-local-network
+
+  node-ingestion:
+    build: ./ingestion-service
+    container_name: local-node-gateway
+    environment:
+      - PORT=3000
+      - GITHUB_WEBHOOK_SECRET=kanakuze@12345
+      - CELERY_BROKER_URL=redis://redis-broker:6379/0
+    depends_on:
+      - redis-broker
+    networks:
+      - ai-devops-local-network
+
+  django-dashboard:
+    build: ./django-dashboard
+    container_name: local-django-dashboard
+    command: python manage.py runserver 0.0.0.0:8000
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgres://devops_local_admin:LocalDevelopmentPassword99@postgres-db:5432/ai_devops_db_local
+      - CELERY_BROKER_URL=redis://redis-broker:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis-broker:6379/0
+      - GITHUB_APP_IDENTIFIER=4035498
+      - GITHUB_APP_PRIVATE_KEY_PATH=/app/certs/github_app.pem
+      - STRIPE_SECRET_KEY=sk_test_mockkey
+      - STRIPE_WEBHOOK_SIGNING_SECRET=whsec_mockkey
+      - STRIPE_ENTERPRISE_PRICE_ID=price_mock
+      - STRIPE_SUCCESS_URL=http://localhost/dashboard/
+      - STRIPE_CANCEL_URL=http://localhost/
+      - SENDGRID_API_KEY=mock_sendgrid_key
+      - SLACK_ALERTS_WEBHOOK_URL=
+      - FERNET_KEY=Pohbz-5z449bmw8_Fv3vlsg1u2veYPiEPqSaUbcepSs=
+    volumes:
+      - ./django-dashboard:/app
+      - ./certs:/app/certs:ro
+    depends_on:
+      - postgres-db
+      - redis-broker
+    networks:
+      - ai-devops-local-network
+
+  celery-worker:
+    build: ./django-dashboard
+    container_name: local-celery-worker
+    command: celery -A config worker --loglevel=info --concurrency=1
+    environment:
+      - DATABASE_URL=postgres://devops_local_admin:LocalDevelopmentPassword99@postgres-db:5432/ai_devops_db_local
+      - CELERY_BROKER_URL=redis://redis-broker:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis-broker:6379/0
+      - GITHUB_APP_IDENTIFIER=4035498
+      - GITHUB_APP_PRIVATE_KEY_PATH=/app/certs/github_app.pem
+      - SLACK_ALERTS_WEBHOOK_URL=
+      - SENDGRID_API_KEY=mock_sendgrid_key
+      - FERNET_KEY=Pohbz-5z449bmw8_Fv3vlsg1u2veYPiEPqSaUbcepSs=
+    volumes:
+      - ./django-dashboard:/app
+      - ./certs:/app/certs:ro
+    depends_on:
+      - redis-broker
+      - postgres-db
+    networks:
+      - ai-devops-local-network
+
+  fastapi-brain:
+    build: ./core-brain
+    container_name: local-fastapi-brain
+    environment:
+      - LITELLM_MODEL=openrouter/qwen/qwen-2.5-coder-32b-instruct
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./core-brain/.env:/app/.env
+    networks:
+      - ai-devops-local-network
+
+  caddy-proxy:
+    image: caddy:2-alpine
+    container_name: local-caddy-proxy
+    ports:
+      - "80:80"
+    volumes:
+      - ./Caddyfile.local:/etc/caddy/Caddyfile
+    depends_on:
+      - node-ingestion
+      - django-dashboard
+    networks:
+      - ai-devops-local-network

@@ -1,0 +1,43 @@
+name: Autonomous AI Code Remediation
+run-name: AI Patch-Bot Code Analysis Pipeline [Ref: ${{ github.ref_name }}]
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+
+jobs:
+  analyze-and-remediate:
+    name: Execute Isolated AI Remediator
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout Code Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect Modified Engineering Files
+        id: change-detector
+        run: |
+          CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r ${{ github.sha }} | grep -E '\.(py|js|jsx|ts|tsx)$' || true)
+
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "run_pipeline=false" >> $GITHUB_OUTPUT
+          else
+            PRIMARY_FILE=$(echo "$CHANGED_FILES" | head -n 1)
+            echo "target_file=$PRIMARY_FILE" >> $GITHUB_OUTPUT
+            echo "run_pipeline=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Invoke AI Patch-Bot CLI Engine
+        if: steps.change-detector.outputs.run_pipeline == 'true'
+        env:
+          PATCHBOT_API_KEY: ${{ secrets.PATCHBOT_API_KEY }}
+        run: |
+          chmod +x ./infra/patch-bot.sh
+
+          TARGET="${{ steps.change-detector.outputs.target_file }}"
+          DESCRIPTION="Automated continuous integration patch verification run for modifications inside $TARGET."
+
+          ./infra/patch-bot.sh "$TARGET" "$DESCRIPTION"

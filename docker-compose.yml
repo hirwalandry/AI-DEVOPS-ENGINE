@@ -1,0 +1,150 @@
+version: '3.8'
+
+networks:
+  ai-devops-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  caddy_data:
+  caddy_config:
+
+services:
+  postgres-db:
+    image: postgres:15-alpine
+    container_name: enterprise-postgres
+    environment:
+      POSTGRES_DB: ai_devops_db
+      POSTGRES_USER: devops_admin
+      POSTGRES_PASSWORD: SecretSecurePasswordChangeMe
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - ai-devops-network
+    restart: always
+
+  redis-broker:
+    image: redis:7-alpine
+    container_name: enterprise-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - ai-devops-network
+    restart: always
+
+  node-ingestion:
+    build: ./ingestion-service
+    container_name: edge-node-gateway
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - GITHUB_WEBHOOK_SECRET=kanakuze@12345
+      - CELERY_BROKER_URL=redis://redis-broker:6379/0
+    depends_on:
+      - redis-broker
+    networks:
+      - ai-devops-network
+    restart: always
+
+  django-dashboard:
+    build: ./django-dashboard
+    container_name: control-django-dashboard
+    ports:
+      - "8000:8000"
+    command: daphne -b 0.0.0.0 -p 8000 config.asgi:application
+    environment:
+      - DATABASE_URL=postgres://devops_admin:SecretSecurePasswordChangeMe@postgres-db:5432/ai_devops_db
+      - REDIS_URL=redis://redis-broker:6379/0
+      - CELERY_BROKER_URL=redis://redis-broker:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis-broker:6379/0
+      - GITHUB_APP_IDENTIFIER=4035498
+      - GITHUB_APP_PRIVATE_KEY_PATH=/app/certs/github_app.pem
+      - GITHUB_WEBHOOK_SECRET=kanakuze@12345
+      - DJANGO_SECRET_KEY=django-insecure-production-change-me
+      - FERNET_KEY=Pohbz-5z449bmw8_Fv3vlsg1u2veYPiEPqSaUbcepSs=
+    volumes:
+      - ./certs:/app/certs:ro
+    depends_on:
+      - postgres-db
+      - redis-broker
+    networks:
+      - ai-devops-network
+    restart: always
+
+  celery-beat:
+    build: ./django-dashboard
+    container_name: scheduled-celery-beat
+    command: celery -A config beat --loglevel=info
+    environment:
+      - DATABASE_URL=postgres://devops_admin:SecretSecurePasswordChangeMe@postgres-db:5432/ai_devops_db
+      - REDIS_URL=redis://redis-broker:6379/0
+      - CELERY_BROKER_URL=redis://redis-broker:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis-broker:6379/0
+      - GITHUB_APP_IDENTIFIER=4035498
+      - GITHUB_APP_PRIVATE_KEY_PATH=/app/certs/github_app.pem
+      - FERNET_KEY=Pohbz-5z449bmw8_Fv3vlsg1u2veYPiEPqSaUbcepSs=
+      - DJANGO_SECRET_KEY=django-insecure-production-change-me
+    volumes:
+      - ./certs:/app/certs:ro
+    depends_on:
+      - redis-broker
+      - postgres-db
+    networks:
+      - ai-devops-network
+    restart: always
+
+  celery-worker:
+    build: ./django-dashboard
+    container_name: async-celery-worker
+    command: celery -A config worker --loglevel=info --concurrency=2
+    environment:
+      - DATABASE_URL=postgres://devops_admin:SecretSecurePasswordChangeMe@postgres-db:5432/ai_devops_db
+      - REDIS_URL=redis://redis-broker:6379/0
+      - CELERY_BROKER_URL=redis://redis-broker:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis-broker:6379/0
+      - GITHUB_APP_IDENTIFIER=4035498
+      - GITHUB_APP_PRIVATE_KEY_PATH=/app/certs/github_app.pem
+      - FERNET_KEY=Pohbz-5z449bmw8_Fv3vlsg1u2veYPiEPqSaUbcepSs=
+      - DJANGO_SECRET_KEY=django-insecure-production-change-me
+    volumes:
+      - ./certs:/app/certs:ro
+    depends_on:
+      - redis-broker
+      - postgres-db
+    networks:
+      - ai-devops-network
+    restart: always
+
+  fastapi-brain:
+    build: ./core-brain
+    container_name: core-fastapi-brain
+    ports:
+      - "8010:8010"
+    environment:
+      - LITELLM_MODEL=openrouter/openai/gpt-4o-mini
+      - OLLAMA_API_BASE=https://openrouter.ai/api/v1
+      - HOST=0.0.0.0
+      - PORT=8010
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./core-brain/.env:/app/.env
+    networks:
+      - ai-devops-network
+    restart: always
+
+  caddy-proxy:
+    image: caddy:2-alpine
+    container_name: production-caddy-proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - ai-devops-network
+    restart: always

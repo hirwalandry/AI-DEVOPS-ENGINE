@@ -1,0 +1,57 @@
+name: Core Repository Sanity & Linter Pipeline
+run-name: Codebase Health Assessment [Branch: ${{ github.ref_name }}]
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  python-compliance:
+    name: Lint Python Ecosystem
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code Tree
+        uses: actions/checkout@v4
+
+      - name: Setup Python Runtime Environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Linting Tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff black
+
+      - name: Enforce Formatting Boundaries (Black)
+        run: black --check core-brain/ django-dashboard/
+
+      - name: Deep Structural Static Analysis (Ruff)
+        run: ruff check core-brain/ django-dashboard/
+
+  nodejs-compliance:
+    name: Lint Node.js Ingestion Gateway
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code Tree
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Runtime Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: './ingestion-service/package-lock.json'
+
+      - name: Install Gateway Dependencies
+        run: |
+          cd ingestion-service
+          npm ci
+
+      - name: Run Syntax and Code Sanity Audits
+        run: |
+          cd ingestion-service
+          node --check index.js

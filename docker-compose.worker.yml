@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  celery-worker:
+    image: yourdockerhub/django-app:latest
+    command: celery -A config worker --loglevel=info --concurrency=4
+    environment:
+      - DATABASE_URL=postgres://admin:pwd@your-managed-db-ip:5432/db
+      - CELERY_BROKER_URL=redis://your-dedicated-redis-broker-ip:6379/0
+      - CELERY_RESULT_BACKEND=redis://your-dedicated-redis-broker-ip:6379/0
+      - GITHUB_APP_IDENTIFIER=${GITHUB_APP_IDENTIFIER}
+      - GITHUB_APP_PRIVATE_KEY_PATH=/app/certs/github_app.pem
+      - SLACK_ALERTS_WEBHOOK_URL=${SLACK_ALERTS_WEBHOOK_URL}
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY}
+      - FERNET_KEY=${FERNET_KEY}
+    volumes:
+      - ./certs:/app/certs:ro
+    networks:
+      - ai-devops-network
+
+  fastapi-brain:
+    image: yourdockerhub/fastapi-brain:latest
+    environment:
+      - LITELLM_MODEL=${LITELLM_MODEL}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - ai-devops-network
+
+networks:
+  ai-devops-network:
+    driver: bridge
