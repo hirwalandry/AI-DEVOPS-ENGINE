@@ -3,6 +3,7 @@ from .views import (
     GitHubAppCallbackView,
     UserDashboardView,
     LogsStreamView,
+    LogDetailView,
     CreateStripeCheckoutSessionView,
     StripeWebhookListenerView,
     UsageMeteringWebhookView,
@@ -29,4 +30,5 @@ urlpatterns = [
     path('api/v1/deployments/', DeploymentListView.as_view(), name='deployment_list'),
     path('api/v1/deployments/<int:deployment_id>/', DeploymentDetailView.as_view(), name='deployment_detail'),
     path('api/v1/deployments/trigger/', TriggerDeploymentView.as_view(), name='trigger_deployment'),
+    path('logs/<str:project_id>/', LogDetailView.as_view(), name='log_detail'),
 ]

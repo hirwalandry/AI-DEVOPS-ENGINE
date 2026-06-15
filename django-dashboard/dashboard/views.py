@@ -70,6 +70,21 @@ class LogsStreamView(View):
         return JsonResponse(data, safe=False)
 
 
+class LogDetailView(View):
+    def get(self, request, project_id):
+        log = RunAuditLog.objects.filter(project_id=project_id).first()
+        if not log:
+            return JsonResponse({"error": "No log found for this project"}, status=404)
+        return JsonResponse({
+            "project_id": log.project_id,
+            "repository_name": log.repository_name,
+            "target_language": log.target_language,
+            "execution_status": log.execution_status,
+            "execution_summary": log.execution_summary,
+            "created_at": log.created_at.isoformat(),
+        })
+
+
 class CreateStripeCheckoutSessionView(LoginRequiredMixin, View):
     def post(self, request, *args, **kwargs):
         org_name = request.user.username
